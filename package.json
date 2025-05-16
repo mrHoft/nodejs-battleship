@@ -1,0 +1,28 @@
+{
+  "name": "nodejs-battleship",
+  "version": "0.0.1",
+  "description": "WebSocket Node.js server & client for battleship game",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node ./index.js",
+    "dev": "nodemon",
+    "lint": "tsc --noEmit",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "authors": [
+    "Andrei Auchynnikau",
+    "mrHoft"
+  ],
+  "keywords": [],
+  "license": "ISC",
+  "dependencies": {
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3",
+    "ws": "^8.18.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10",
+    "@types/node": "^22.15.15"
+  }
+}
