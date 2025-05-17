@@ -2,8 +2,7 @@
   "name": "nodejs-battleship",
   "version": "0.0.1",
   "description": "WebSocket Node.js server & client for battleship game",
-  "main": "index.js",
-  "type": "module",
+  "private": true,
   "scripts": {
     "start": "node ./index.js",
     "dev": "nodemon",
@@ -22,7 +21,8 @@
     "ws": "^8.18.2"
   },
   "devDependencies": {
-    "nodemon": "^3.1.10",
-    "@types/node": "^22.15.15"
+    "@types/node": "^22.15.15",
+    "@types/ws": "^8.18.1",
+    "nodemon": "^3.1.10"
   }
 }

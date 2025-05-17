@@ -6,5 +6,5 @@
     "src"
   ],
   "ext": "ts",
-  "exec": "ts-node src/index.ts"
+  "exec": "ts-node -T src/ws_server/index.ts"
 }
