@@ -12,8 +12,8 @@ export function printShips(ships: Ship[]): void {
 
   ships.forEach(ship => {
     for (let i = 0; i < ship.length; i++) {
-      const x = ship.direction ? ship.position.x + i : ship.position.x;
-      const y = ship.direction ? ship.position.y : ship.position.y + i;
+      const x = ship.direction ? ship.position.x : ship.position.x + i;
+      const y = ship.direction ? ship.position.y + i : ship.position.y;
       if (x >= 0 && x < 10 && y >= 0 && y < 10) {
         visualBoard[x][y] = shipSymbols[ship.type] || '?';
       }

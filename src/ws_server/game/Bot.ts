@@ -2,8 +2,15 @@ import type { Ship, Game } from '../types';
 import { BOT_PLAYER_ID } from '../types';
 import { printBoard, printShips } from '../utils/board';
 
+type TDifficulty = 'easy' | 'medium' | 'hard'
+const missChance: Record<TDifficulty, number> = {
+  easy: 0.9,
+  medium: 0.5,
+  hard: 0.1
+}
+
 export class BotManager {
-  // private difficulty: 'easy' | 'medium' | 'hard' = 'medium';
+  private difficulty: TDifficulty = 'medium';
 
   createRandomBoard(): { board: (null | 'ship')[][]; ships: Ship[] } {
     const board: (null | 'ship')[][] = Array(10).fill(null).map(() => Array(10).fill(null));
@@ -19,13 +26,13 @@ export class BotManager {
       for (let i = 0; i < shipType.count; i++) {
         let placed = false;
         let attempts = 0;
-        const maxAttempts = 100; // Prevent infinite loops
+        const maxAttempts = 100;
 
         while (!placed && attempts < maxAttempts) {
           attempts++;
-          const direction = Math.random() > 0.5; // true = horizontal, false = vertical
-          const maxX = direction ? 10 - shipType.length : 10;
-          const maxY = direction ? 10 : 10 - shipType.length;
+          const direction = Math.random() > 0.5;
+          const maxX = direction ? 10 : 10 - shipType.length;
+          const maxY = direction ? 10 - shipType.length : 10;
 
           if (maxX <= 0 || maxY <= 0) continue;
 
@@ -52,24 +59,20 @@ export class BotManager {
       }
     });
 
-    // printBoard(board)
     printShips(ships)
+    printBoard(board, true)
     return { board, ships };
   }
 
   private canPlaceShip(board: (null | 'ship')[][], ship: Ship): boolean {
-    // Check all cells the ship would occupy
     for (let i = 0; i < ship.length; i++) {
-      const x = ship.direction ? ship.position.x + i : ship.position.x;
-      const y = ship.direction ? ship.position.y : ship.position.y + i;
+      const x = ship.direction ? ship.position.x : ship.position.x + i;
+      const y = ship.direction ? ship.position.y + i : ship.position.y;
 
-      // Check if out of bounds
       if (x >= 10 || y >= 10) return false;
 
-      // Check if cell is already occupied
       if (board[x][y] === 'ship') return false;
 
-      // Check adjacent cells (no touching ships)
       for (let dx = -1; dx <= 1; dx++) {
         for (let dy = -1; dy <= 1; dy++) {
           const adjX = x + dx;
@@ -85,22 +88,23 @@ export class BotManager {
 
   private placeShip(board: (null | 'ship')[][], ship: Ship): void {
     for (let i = 0; i < ship.length; i++) {
-      const x = ship.direction ? ship.position.x + i : ship.position.x;
-      const y = ship.direction ? ship.position.y : ship.position.y + i;
+      const x = ship.direction ? ship.position.x : ship.position.x + i;
+      const y = ship.direction ? ship.position.y + i : ship.position.y;
       board[x][y] = 'ship';
     }
   }
 
   makeMove(game: Game): { x: number; y: number } {
-    // Basic AI - can be enhanced based on difficulty
+    // Basic AI
+    const chance = missChance[this.difficulty]
     const player = game.players.find(p => p.idPlayer !== BOT_PLAYER_ID);
     if (!player) return { x: 0, y: 0 };
 
-    // Simple random move for now
     const availableCells: { x: number; y: number }[] = [];
     for (let x = 0; x < 10; x++) {
       for (let y = 0; y < 10; y++) {
-        if (player.board[x][y] === null) {
+        const cell = player.board[x][y]
+        if (cell === 'ship' || (cell === null && Math.random() <= chance)) {
           availableCells.push({ x, y });
         }
       }

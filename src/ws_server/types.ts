@@ -5,6 +5,8 @@ export interface Player {
   wins: number;
 }
 
+export type TBoard = (null | 'ship' | 'hit' | 'miss')[][]
+
 export const BOT_PLAYER_ID = "BOT";
 
 export interface Ship {
@@ -31,7 +33,7 @@ export interface Game {
   players: {
     idPlayer: number | string;
     ships: Ship[];
-    board: (null | "ship" | "hit" | "miss")[][];
+    board: TBoard;
     hitsReceived: number;
   }[];
   currentPlayerIndex: number | string;

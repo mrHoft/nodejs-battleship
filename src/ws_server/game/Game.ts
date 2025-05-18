@@ -1,9 +1,10 @@
 // src/game/Game.ts
-import type { Game, Ship, AttackStatus } from '../types';
+import type { Game, Ship, AttackStatus, TBoard } from '../types';
 import { BOT_PLAYER_ID } from '../types';
 import { BotManager } from './Bot';
 import { PlayerManager } from './Player';
 import { WinnersDB } from '../db/winners';
+import { printBoard, printShips } from '../utils/board';
 
 export class GameManager {
   private games: Game[] = [];
@@ -51,7 +52,9 @@ export class GameManager {
     }
 
     player.ships = ships;
-    this.placeShipsOnBoard(player.board, ships);
+    player.board = this.placeShipsOnBoard(ships);
+    printShips(player.ships)
+    printBoard(player.board, true)
 
     if (game.players.every(p => p.ships.length > 0)) {
       game.started = true;
@@ -67,31 +70,35 @@ export class GameManager {
     }
 
     const defender = game.players.find(p => p.idPlayer !== attackerId);
-    if (!defender) return null;
+    if (!defender) {
+      console.log('Wrong attacker id:', attackerId)
+      return null;
+    }
 
-    // Check if coordinate was already attacked
     if (defender.board[x][y] === 'hit' || defender.board[x][y] === 'miss') {
+      console.log(`Coordinate ${x}-${y} was already attacked`)
+      printBoard(defender.board)
       return null;
     }
 
     let result: { status: AttackStatus; gameOver?: boolean; winnerId?: number | string };
 
     if (defender.board[x][y] === 'ship') {
-      // Hit a ship
+      const ship = this.findShipAt(defender.ships, x, y);
+      if (!ship) {
+        console.log(`No ship on coordinate ${x}-${y}`)
+        printBoard(defender.board, true)
+        return null;
+      }
+
       defender.board[x][y] = 'hit';
       defender.hitsReceived++;
 
-      const ship = this.findShipAt(defender.ships, x, y);
-      if (!ship) return null;
-
-      // Check if ship is completely sunk
       const isSunk = this.isShipSunk(defender.board, ship);
 
       if (isSunk) {
-        // Mark surrounding cells as miss (battleship rules)
         this.markAroundShip(defender.board, ship);
 
-        // Check if all ships are sunk (game over)
         const allSunk = defender.ships.every(s => this.isShipSunk(defender.board, s));
 
         if (allSunk) {
@@ -101,7 +108,6 @@ export class GameManager {
             winnerId: attackerId
           };
 
-          // Update winner stats
           const winner = this.playerManager.getPlayer(attackerId);
           if (winner) {
             this.winnersDB.addWinner(winner);
@@ -113,10 +119,8 @@ export class GameManager {
         result = { status: 'shot' };
       }
     } else {
-      // Miss
       defender.board[x][y] = 'miss';
       result = { status: 'miss' };
-      // Switch turns
       game.currentPlayerIndex = defender.idPlayer;
     }
 
@@ -186,7 +190,10 @@ export class GameManager {
     const game = this.getGame(gameId);
     if (!game) return false;
 
-    return game.players.every(player => player.ships.length > 0);
+    return game.players.every((player, i) => {
+      console.log(`Player ${i} ships:`, player.ships.length)
+      return player.ships.length > 0
+    });
   }
 
   generateRandomAttack(gameId: number | string): { x: number; y: number } | null {
@@ -200,7 +207,8 @@ export class GameManager {
     const availableCells: { x: number; y: number }[] = [];
     for (let x = 0; x < 10; x++) {
       for (let y = 0; y < 10; y++) {
-        if (defender.board[x][y] === null) {
+        const cell = defender.board[x][y]
+        if (cell === null || cell === 'ship') {
           availableCells.push({ x, y });
         }
       }
@@ -211,18 +219,18 @@ export class GameManager {
     return availableCells[Math.floor(Math.random() * availableCells.length)];
   }
 
-  private createEmptyBoard(): (null | 'ship' | 'hit' | 'miss')[][] {
+  private createEmptyBoard(): TBoard {
     return Array(10).fill(null).map(() => Array(10).fill(null));
   }
 
   createSinglePlayerGame(humanPlayerId: number | string): Game {
-    const { ships: playerShips } = this.botManager.createRandomBoard()
     const game: Game = {
       idGame: this.generateGameId(),
       players: [
         {
           idPlayer: humanPlayerId,
-          ships: playerShips,
+          // ...this.botManager.createRandomBoard(),
+          ships: [],
           board: this.createEmptyBoard(),
           hitsReceived: 0
         },
@@ -233,7 +241,7 @@ export class GameManager {
         }
       ],
       currentPlayerIndex: humanPlayerId,
-      started: true,
+      started: false,
       isBotGame: true
     };
 
@@ -276,19 +284,19 @@ export class GameManager {
     return true;
   }
 
-  private placeShipsOnBoard(
-    board: (null | 'ship' | 'hit' | 'miss')[][],
-    ships: Ship[]
-  ): void {
+  private placeShipsOnBoard(ships: Ship[]) {
+    const board = this.createEmptyBoard()
     ships.forEach(ship => {
       for (let i = 0; i < ship.length; i++) {
-        const x = ship.direction ? ship.position.x + i : ship.position.x;
-        const y = ship.direction ? ship.position.y : ship.position.y + i;
+        const x = ship.direction ? ship.position.x : ship.position.x + i;
+        const y = ship.direction ? ship.position.y + i : ship.position.y;
         if (x < 10 && y < 10) {
           board[x][y] = 'ship';
         }
       }
     });
+
+    return board
   }
 
   private findShipAt(ships: Ship[], x: number, y: number): Ship | undefined {
@@ -296,28 +304,25 @@ export class GameManager {
       if (ship.direction) {
         // Horizontal ship
         return (
-          ship.position.y === y &&
-          x >= ship.position.x &&
-          x < ship.position.x + ship.length
+          ship.position.x === x &&
+          y >= ship.position.y &&
+          y < ship.position.y + ship.length
         );
       } else {
         // Vertical ship
         return (
-          ship.position.x === x &&
-          y >= ship.position.y &&
-          y < ship.position.y + ship.length
+          ship.position.y === y &&
+          x >= ship.position.x &&
+          x < ship.position.x + ship.length
         );
       }
     });
   }
 
-  private isShipSunk(
-    board: (null | 'ship' | 'hit' | 'miss')[][],
-    ship: Ship
-  ): boolean {
+  private isShipSunk(board: TBoard, ship: Ship): boolean {
     for (let i = 0; i < ship.length; i++) {
-      const x = ship.direction ? ship.position.x + i : ship.position.x;
-      const y = ship.direction ? ship.position.y : ship.position.y + i;
+      const x = ship.direction ? ship.position.x : ship.position.x + i;
+      const y = ship.direction ? ship.position.y + i : ship.position.y;
       if (board[x][y] !== 'hit') {
         return false;
       }
@@ -325,20 +330,18 @@ export class GameManager {
     return true;
   }
 
-  private markAroundShip(
-    board: (null | 'ship' | 'hit' | 'miss')[][],
-    ship: Ship
-  ): void {
+  private markAroundShip(board: TBoard, ship: Ship): void {
     for (let i = -1; i <= ship.length; i++) {
       for (let j = -1; j <= 1; j++) {
-        const x = ship.direction ? ship.position.x + i : ship.position.x + j;
-        const y = ship.direction ? ship.position.y + j : ship.position.y + i;
+        const x = ship.direction ? ship.position.x + j : ship.position.x + i;
+        const y = ship.direction ? ship.position.y + i : ship.position.y + j;
 
         if (x >= 0 && x < 10 && y >= 0 && y < 10 && board[x][y] === null) {
           board[x][y] = 'miss';
         }
       }
     }
+    printBoard(board, true)
   }
 
   private generateGameId(): number {

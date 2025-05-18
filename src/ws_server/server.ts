@@ -41,7 +41,6 @@ export class BattleshipServer {
       Logger.logConnection(ws, ip, port);
 
       ws.on('message', (message) => {
-        console.log(message.toString())
         try {
           const command: Command = JSON.parse(message.toString());
           if (command.data && typeof command.data === 'string') {
@@ -180,6 +179,11 @@ export class BattleshipServer {
       return;
     }
 
+    if (room.roomUsers.some(player => player.index === playerId)) {
+      this.sendError(ws, 'Already in room');
+      return;
+    }
+
     if (room.roomUsers.length === 2) {
       const playerIds = room.roomUsers.map(player => player.index)
       const game = this.gameManager.createGame(playerIds);
@@ -273,7 +277,6 @@ export class BattleshipServer {
           if (result.gameOver) {
             this.handleGameOver(data.gameId, result.winnerId!);
           } else if (result.status === 'miss') {
-            // Send turn update
             this.sendResponse(playerWs, {
               type: 'turn',
               data: {
@@ -285,50 +288,55 @@ export class BattleshipServer {
         }
       });
       if (game.isBotGame && game.currentPlayerIndex === BOT_PLAYER_ID) {
-        setTimeout(() => {
-          const botMove = this.gameManager.processBotMove(data.gameId);
-          if (botMove) {
-            const updatedGame = this.gameManager.getGame(data.gameId);
-            if (!updatedGame) return;
-
-            // Send bot attack result to human player
-            this.sendResponse(ws, {
-              type: 'attack',
-              data: {
-                position: { x: botMove.x, y: botMove.y },
-                currentPlayer: BOT_PLAYER_ID,
-                status: botMove.status
-              },
-              id: 0
-            });
-
-            // Send turn update
-            this.sendResponse(ws, {
-              type: 'turn',
-              data: {
-                currentPlayer: updatedGame.currentPlayerIndex
-              },
-              id: 0
-            });
-
-            // Check if game over
-            if (botMove.status === 'killed') {
-              const humanPlayer = updatedGame.players.find(p => p.idPlayer !== BOT_PLAYER_ID);
-              if (humanPlayer && this.gameManager.isAllShipsSunk(updatedGame.idGame, humanPlayer.idPlayer)) {
-                this.sendResponse(ws, {
-                  type: 'finish',
-                  data: {
-                    winPlayer: BOT_PLAYER_ID,
-                    reason: 'all_ships_sunk'
-                  },
-                  id: 0
-                });
-              }
-            }
-          }
-        }, 1000);
+        this.handleBot(ws, data)
       }
     }
+  }
+
+  private handleBot(ws: WebSocket, data: AttackData) {
+    setTimeout(() => {
+      const botMove = this.gameManager.processBotMove(data.gameId);
+      if (botMove) {
+        const updatedGame = this.gameManager.getGame(data.gameId);
+        if (!updatedGame) return;
+
+        // Send bot attack result to human player
+        this.sendResponse(ws, {
+          type: 'attack',
+          data: {
+            position: { x: botMove.x, y: botMove.y },
+            currentPlayer: BOT_PLAYER_ID,
+            status: botMove.status
+          },
+          id: 0
+        });
+
+        if (botMove.status === 'miss') {
+          this.sendResponse(ws, {
+            type: 'turn',
+            data: {
+              currentPlayer: updatedGame.currentPlayerIndex
+            },
+            id: 0
+          });
+        } else {
+          this.handleBot(ws, data)
+        }
+        if (botMove.status === 'killed') {
+          const humanPlayer = updatedGame.players.find(p => p.idPlayer !== BOT_PLAYER_ID);
+          if (humanPlayer && this.gameManager.isAllShipsSunk(updatedGame.idGame, humanPlayer.idPlayer)) {
+            this.sendResponse(ws, {
+              type: 'finish',
+              data: {
+                winPlayer: BOT_PLAYER_ID,
+                reason: 'all_ships_sunk'
+              },
+              id: 0
+            });
+          }
+        }
+      }
+    }, 500);
   }
 
   private handleRandomAttack(ws: WebSocket, data: RandomAttackData) {
@@ -344,7 +352,6 @@ export class BattleshipServer {
       return;
     }
 
-    // Process the random attack
     this.handleAttack(ws, {
       gameId: data.gameId,
       x: randomCoords.x,
@@ -360,10 +367,8 @@ export class BattleshipServer {
       return;
     }
 
-    // Create single player game
     const game = this.gameManager.createSinglePlayerGame(playerId);
 
-    // Send game created response
     this.sendResponse(ws, {
       type: 'create_game',
       data: {
@@ -372,19 +377,6 @@ export class BattleshipServer {
       },
       id: 0
     });
-
-    // Automatically start game since bot is ready
-    const humanPlayer = game.players.find(p => p.idPlayer === playerId);
-    if (humanPlayer) {
-      this.sendResponse(ws, {
-        type: 'start_game',
-        data: {
-          ships: humanPlayer.ships, // Will be empty until player adds ships
-          currentPlayerIndex: playerId
-        },
-        id: 0
-      });
-    }
   }
 
   private handleGameOver(gameId: string | number, winnerId: string | number) {
@@ -413,9 +405,9 @@ export class BattleshipServer {
     this.gameManager.removeGame(gameId);
   }
 
-  private broadcastRoomsUpdate() {
+  private getRoomsInfo(): RoomInfo[] {
     const rooms = this.roomManager.getAvailableRooms();
-    const roomResponses: RoomInfo[] = rooms.map(room => ({
+    return rooms.map(room => ({
       roomId: room.roomId,
       roomUsers: room.roomUsers.map(user => {
         const player = this.playerManager.getPlayer(user.index);
@@ -425,10 +417,12 @@ export class BattleshipServer {
         };
       }),
     }));
+  }
 
+  private broadcastRoomsUpdate() {
     this.broadcastToAll({
       type: 'update_room',
-      data: roomResponses,
+      data: this.getRoomsInfo(),
       id: 0,
     });
   }
