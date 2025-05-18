@@ -1,34 +1,41 @@
 import WebSocket from 'ws';
 
+interface ClientInfo { ip: string; port?: number }
+
 export class Logger {
-  static getClientInfo(ws: WebSocket): { ip: string; port?: number } {
-    return {
-      ip: (ws as any).clientIp || 'unknown',
-      port: (ws as any).clientPort
-    };
+  private sockets: Map<WebSocket, ClientInfo> = new Map()
+
+  private getClientInfo(ws: WebSocket): ClientInfo {
+    return this.sockets.get(ws) ?? { ip: 'unknown' }
   }
 
-  static logConnection(ws: WebSocket, ip: string, port?: number): void {
-    console.log(`[${new Date().toISOString()}] [${ip}:${port || '?'}] Client connected`);
+  private getTimestamp() {
+    const [date, time] = new Date().toISOString().split('T')
+    return `${date} ${time.slice(0, 8)}`
   }
 
-  static logDisconnection(ws: WebSocket): void {
+  logConnection(ws: WebSocket, ip: string, port?: number): void {
+    this.sockets.set(ws, { ip, port })
+    console.log(`[${this.getTimestamp()}] [${ip}:${port || '?'}] Client connected`);
+  }
+
+  logDisconnection(ws: WebSocket): void {
     const { ip, port } = this.getClientInfo(ws);
-    console.log(`[${new Date().toISOString()}] [${ip}:${port || '?'}] Client disconnected`);
+    console.log(`[${this.getTimestamp()}] [${ip}:${port || '?'}] Client disconnected`);
   }
 
-  static logCommand(ws: WebSocket, command: any): void {
+  logCommand(ws: WebSocket, command: any): void {
     const { ip, port } = this.getClientInfo(ws);
-    console.log(`[${new Date().toISOString()}] [${ip}:${port || '?'}] Received command:`, command);
+    console.log(`[${this.getTimestamp()}] [${ip}:${port || '?'}] Received command:`, command);
   }
 
-  static logResponse(ws: WebSocket, response: any): void {
+  logResponse(ws: WebSocket, response: any): void {
     const { ip, port } = this.getClientInfo(ws);
-    console.log(`[${new Date().toISOString()}] [${ip}:${port || '?'}] Sent response:`, response);
+    console.log(`[${this.getTimestamp()}] [${ip}:${port || '?'}] Sent response:`, response);
   }
 
-  static logError(ws: WebSocket, error: Error): void {
+  logError(ws: WebSocket, error: Error): void {
     const { ip, port } = this.getClientInfo(ws);
-    console.error(`[${new Date().toISOString()}] [${ip}:${port || '?'}] Error:`, error);
+    console.error(`[${this.getTimestamp()}] [${ip}:${port || '?'}] Error:`, error);
   }
 }

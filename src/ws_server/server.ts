@@ -20,6 +20,7 @@ export class BattleshipServer {
   private roomManager: RoomManager;
   private gameManager: GameManager;
   private playerManager: PlayerManager;
+  private logger: Logger
 
   constructor() {
     this.wss = new WebSocketServer({ port: Number(PORT) });
@@ -28,6 +29,7 @@ export class BattleshipServer {
     this.roomManager = new RoomManager();
     this.playerManager = new PlayerManager()
     this.gameManager = new GameManager(this.playerManager, this.winnersDB);
+    this.logger = new Logger()
 
     console.log(`WebSocket server started on ws://localhost:${PORT}`);
     this.setupEventHandlers();
@@ -38,7 +40,7 @@ export class BattleshipServer {
       const ip = req.socket.remoteAddress || 'unknown';
       const port = req.socket.remotePort;
 
-      Logger.logConnection(ws, ip, port);
+      this.logger.logConnection(ws, ip, port);
 
       ws.on('message', (message) => {
         try {
@@ -48,20 +50,20 @@ export class BattleshipServer {
           }
           this.handleCommand(ws, command);
         } catch (error) {
-          Logger.logError(ws, error as Error);
+          this.logger.logError(ws, error as Error);
           this.sendError(ws, 'Invalid message format');
         }
       });
 
       ws.on('close', () => {
-        Logger.logDisconnection(ws);
+        this.logger.logDisconnection(ws);
         this.handleDisconnect(ws);
       });
     });
   }
 
   private handleCommand(ws: WebSocket, command: Command) {
-    Logger.logCommand(ws, command);
+    this.logger.logCommand(ws, command);
 
     try {
       if (!CommandValidator.validate(command)) {
@@ -258,7 +260,6 @@ export class BattleshipServer {
       return;
     }
 
-    // Notify both players
     const game = this.gameManager.getGame(data.gameId);
     if (game) {
       game.players.forEach(player => {
@@ -300,7 +301,6 @@ export class BattleshipServer {
         const updatedGame = this.gameManager.getGame(data.gameId);
         if (!updatedGame) return;
 
-        // Send bot attack result to human player
         this.sendResponse(ws, {
           type: 'attack',
           data: {
@@ -452,7 +452,7 @@ export class BattleshipServer {
     if (ws.readyState === WebSocket.OPEN) {
       const resp = JSON.stringify({ ...response, data: JSON.stringify(response.data) })
       ws.send(resp);
-      Logger.logResponse(ws, response);
+      this.logger.logResponse(ws, response);
     }
   }
 
@@ -474,14 +474,11 @@ export class BattleshipServer {
 
     console.log(`Player ${playerId} disconnected`);
 
-    // 1. Handle room cleanup first
     this.roomManager.handlePlayerDisconnect(playerId);
     this.broadcastRoomsUpdate();
 
-    // 2. Handle game disconnection
     const disconnectResult = this.gameManager.handlePlayerDisconnect(playerId);
 
-    // 3. Notify winners
     disconnectResult.awardedWins.forEach(({ winnerId }) => {
       const winnerWs = this.playerManager.getSocket(winnerId);
       if (winnerWs) {
@@ -496,12 +493,10 @@ export class BattleshipServer {
       }
     });
 
-    // 4. Update winners list for all clients
     if (disconnectResult.awardedWins.length > 0) {
       this.broadcastWinnersUpdate();
     }
 
-    // 5. Clean up player socket reference
     this.playerManager.updateSocket(playerId, null as any);
   }
 

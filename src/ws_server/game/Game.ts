@@ -1,4 +1,3 @@
-// src/game/Game.ts
 import type { Game, Ship, AttackStatus, TBoard } from '../types';
 import { BOT_PLAYER_ID } from '../types';
 import { BotManager } from './Bot';
@@ -150,7 +149,6 @@ export class GameManager {
             gameId: game.idGame
           });
 
-          // Update winner stats
           const winner = this.playerManager.getPlayer(otherPlayer.idPlayer);
           if (winner) {
             this.winnersDB.addWinner(winner);
@@ -229,7 +227,6 @@ export class GameManager {
       players: [
         {
           idPlayer: humanPlayerId,
-          // ...this.botManager.createRandomBoard(),
           ships: [],
           board: this.createEmptyBoard(),
           hitsReceived: 0
@@ -302,14 +299,12 @@ export class GameManager {
   private findShipAt(ships: Ship[], x: number, y: number): Ship | undefined {
     return ships.find(ship => {
       if (ship.direction) {
-        // Horizontal ship
         return (
           ship.position.x === x &&
           y >= ship.position.y &&
           y < ship.position.y + ship.length
         );
       } else {
-        // Vertical ship
         return (
           ship.position.y === y &&
           x >= ship.position.x &&
@@ -341,7 +336,6 @@ export class GameManager {
         }
       }
     }
-    printBoard(board, true)
   }
 
   private generateGameId(): number {

@@ -32,7 +32,6 @@ export class PlayerManager {
     const player = this.players.get(playerId);
     if (!player || player.password !== password) return undefined;
 
-    // Update WebSocket reference
     this.sockets.set(playerId, ws);
     return player;
   }

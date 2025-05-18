@@ -95,7 +95,6 @@ export class BotManager {
   }
 
   makeMove(game: Game): { x: number; y: number } {
-    // Basic AI
     const chance = missChance[this.difficulty]
     const player = game.players.find(p => p.idPlayer !== BOT_PLAYER_ID);
     if (!player) return { x: 0, y: 0 };
