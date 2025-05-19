@@ -4,6 +4,8 @@
   "description": "WebSocket Node.js server & client for battleship game",
   "private": true,
   "scripts": {
+    "start:client": "node --no-warnings ./client.js",
+    "start:server": "ts-node src/ws_server/index.ts",
     "start": "node --no-warnings ./index.js",
     "build": "tsc",
     "dev": "nodemon",

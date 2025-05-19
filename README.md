@@ -11,6 +11,8 @@
 Command | Description
 --- | ---
 `npm run start` | Start WebSocket and HTTP pre-builded servers
+`npm run start:client` | Start HTTP pre-builded server
+`npm run start:server` | Start WebSocket server
 `npm run build` | Build WebSocket server
 `npm run dev` | Start WebSocket server at `http://localhost:3000` with nodemon
 `npm run lint` | Type check
@@ -29,7 +31,7 @@ src/
 │   ├── players.ts       # Player database
 │   └── winners.ts       # Winners database
 └── utils/
-│   ├── board.ts         # Game board visualization tools
-│   ├── validation.ts    # Request validation
+    ├── board.ts         # Game board visualization tools
+    ├── validation.ts    # Request validation
     └── logger.ts        # Logging utility
 ```

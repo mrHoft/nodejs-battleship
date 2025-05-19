@@ -169,6 +169,12 @@ class BattleshipServer {
             this.sendError(ws, 'Player not found');
             return;
         }
+        const rooms = this.roomManager.getAvailableRooms();
+        const isInRoom = rooms.some(r => r.roomUsers.some(player => player.index === playerId));
+        if (isInRoom) {
+            this.sendError(ws, 'Already in room');
+            return;
+        }
         this.roomManager.createRoom(player, ws);
         this.broadcastRoomsUpdate();
     }
@@ -183,13 +189,15 @@ class BattleshipServer {
             this.sendError(ws, 'Player not found');
             return;
         }
+        const rooms = this.roomManager.getAvailableRooms();
+        const isInRoom = rooms.some(r => r.roomUsers.some(player => player.index === playerId));
+        if (isInRoom) {
+            this.sendError(ws, 'Already in room');
+            return;
+        }
         const room = this.roomManager.addUserToRoom(roomId, player, ws);
         if (!room) {
             this.sendError(ws, 'Failed to join room');
-            return;
-        }
-        if (room.roomUsers.some(player => player.index === playerId)) {
-            this.sendError(ws, 'Already in room');
             return;
         }
         if (room.roomUsers.length === 2) {
@@ -267,6 +275,7 @@ class BattleshipServer {
                     });
                     if (result.gameOver) {
                         this.handleGameOver(data.gameId, result.winnerId);
+                        this.handleCloseRoom(ws);
                     }
                     else if (result.status === 'miss') {
                         this.sendResponse(playerWs, {
@@ -323,6 +332,12 @@ class BattleshipServer {
                             },
                             id: 0
                         });
+                        this.handleCloseRoom(ws);
+                        this.playerDB.updatePlayerWins(humanPlayer.idPlayer);
+                        const winner = this.playerManager.getPlayer(humanPlayer.idPlayer);
+                        if (winner)
+                            this.winnersDB.addWinner(winner);
+                        this.broadcastWinnersUpdate();
                     }
                 }
             }
@@ -384,6 +399,13 @@ class BattleshipServer {
         });
         this.broadcastWinnersUpdate();
         this.gameManager.removeGame(gameId);
+    }
+    handleCloseRoom(ws) {
+        const roomId = this.roomManager.getPlayerRoomId(ws);
+        if (roomId) {
+            this.roomManager.removeRoom(roomId);
+            this.broadcastRoomsUpdate();
+        }
     }
     getRoomsInfo() {
         const rooms = this.roomManager.getAvailableRooms();
@@ -450,6 +472,10 @@ class BattleshipServer {
         this.broadcastRoomsUpdate();
         const disconnectResult = this.gameManager.handlePlayerDisconnect(playerId);
         disconnectResult.awardedWins.forEach(({ winnerId }) => {
+            this.playerDB.updatePlayerWins(winnerId);
+            const winner = this.playerManager.getPlayer(winnerId);
+            if (winner)
+                this.winnersDB.addWinner(winner);
             const winnerWs = this.playerManager.getSocket(winnerId);
             if (winnerWs) {
                 this.sendResponse(winnerWs, {
@@ -460,6 +486,7 @@ class BattleshipServer {
                     },
                     id: 0
                 });
+                this.handleCloseRoom(ws);
             }
         });
         if (disconnectResult.awardedWins.length > 0) {
