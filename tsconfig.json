@@ -2,13 +2,15 @@
   "compilerOptions": {
     /* Language and Environment */
     "target": "es2016",
+    "lib": ["es2020"],
 
     /* Modules */
-    "module": "commonjs",
+    "module": "node18",
+    "moduleResolution": "node16",
     "baseUrl": "src",
 
     /* Emit */
-    "outDir": "dist",
+    "outDir": "server",
     "removeComments": true,
 
     /* Interop Constraints */
@@ -22,6 +24,13 @@
     "noUnusedParameters": true,
 
     /* Completeness */
-    "skipLibCheck": true
-  }
+    "skipLibCheck": true,
+    "maxNodeModuleJsDepth": 0,
+
+    "paths": {
+      "~/": ["./src/ws_server/"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "server"]
 }
